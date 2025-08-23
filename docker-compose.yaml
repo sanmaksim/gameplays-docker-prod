@@ -1,0 +1,91 @@
+services:
+  traefik:
+    image: traefik:v2.10
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - traefik-certs:/letsencrypt
+      - traefik-config:/etc/traefik
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command:
+      - "--providers.docker=true"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.le.acme.email=kleenex-gulf-diner@duck.com"
+      - "--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json"
+      - "--certificatesresolvers.le.acme.httpchallenge.entrypoint=web"
+      - "--providers.file.filename=/etc/traefik/traefik_dynamic.yaml"
+      - "--providers.file.watch=true"
+
+  backend:
+    image: gameplays-api:latest
+    env_file:
+      - ./prod.env
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.backend.rule=Host(`gameplays.website`) && PathPrefix(`/api`) || Host(`www.gameplays.website`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.backend.entrypoints=websecure"
+      - "traefik.http.routers.backend.tls=true"
+      - "traefik.http.services.backend.loadbalancer.server.port=80"
+
+      # CORS middleware labels
+      - "traefik.http.middlewares.backend-cors.headers.accesscontrolalloworiginlist=https://gameplays.staging"
+      - "traefik.http.middlewares.backend-cors.headers.accesscontrolallowmethods=GET,OPTIONS,PUT,POST,DELETE"
+      - "traefik.http.middlewares.backend-cors.headers.accesscontrolallowheaders=Content-Type,Authorization"
+      - "traefik.http.middlewares.backend-cors.headers.accesscontrolallowcredentials=true"
+      - "traefik.http.middlewares.backend-cors.headers.accesscontrolexposeheaders=Authorization"
+      - "traefik.http.middlewares.backend-cors.headers.accesscontrolmaxage=100"
+      - "traefik.http.middlewares.backend-cors.headers.addvaryheader=true"
+
+      # Attach the middleware to the router
+      - "traefik.http.routers.backend.middlewares=backend-cors"
+
+  frontend:
+    image: gameplays-web:latest
+    env_file:
+      - ./prod.env
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`gameplays.website`) || Host(`www.gameplays.website`)"
+      - "traefik.http.routers.frontend.entrypoints=websecure"
+      - "traefik.http.routers.frontend.tls=true"
+      - "traefik.http.services.frontend.loadbalancer.server.port=80"
+
+  mysql:
+    image: mysql:8.0
+    env_file:
+      - ./mysql.env
+    volumes:
+      - mysql-data:/var/lib/mysql
+  
+  mysql-cron-backup:
+    image: fradelg/mysql-cron-backup
+    depends_on:
+      - mysql
+    volumes:
+      - mysql-backup:/backup
+    env_file:
+      - ./mysql-backup.env
+    labels:
+      - "traefik.enable=false"
+    restart: unless-stopped
+
+  certs-helper:
+    image: alpine
+    volumes:
+      - traefik-config:/etc/traefik
+      - ./config/:/tmp:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command: 
+      - |
+        mkdir -p /etc/traefik
+        cp /tmp/traefik_dynamic.yaml /etc/traefik/.
+        echo "Config copied into volume."
+    restart: "no"
+
+volumes:
+  traefik-certs:
+  traefik-config:
+  mysql-backup:
+  mysql-data:

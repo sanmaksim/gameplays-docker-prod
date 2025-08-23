@@ -1,0 +1,35 @@
+tls:
+  options:
+    default:
+      minVersion: VersionTLS12
+
+http:
+  routers:
+    backend:
+      rule: "(Host(`gameplays.website`) && PathPrefix(`/api`)) || (Host(`www.gameplays.website`) && PathPrefix(`/api`))"
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: le
+      service: backend
+
+    frontend:
+      rule: "Host(`gameplays.website`) || Host(`www.gameplays.website`)"
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: le
+      service: frontend
+
+  services:
+    backend:
+      loadBalancer:
+        servers:
+          - url: "http://backend:80"
+        passHostHeader: true
+
+    frontend:
+      loadBalancer:
+        servers:
+          - url: "http://frontend:80"
+        passHostHeader: true
