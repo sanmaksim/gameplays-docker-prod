@@ -1,3 +1,4 @@
+name: gameplays-prod
 services:
   traefik:
     image: traefik:v2.10
@@ -17,6 +18,7 @@ services:
       - "--certificatesresolvers.le.acme.httpchallenge.entrypoint=web"
       - "--providers.file.filename=/etc/traefik/traefik_dynamic.yaml"
       - "--providers.file.watch=true"
+    restart: always
 
   backend:
     image: gameplays-api:latest
@@ -40,6 +42,7 @@ services:
 
       # Attach the middleware to the router
       - "traefik.http.routers.backend.middlewares=backend-cors"
+    restart: always
 
   frontend:
     image: gameplays-web:latest
@@ -51,6 +54,7 @@ services:
       - "traefik.http.routers.frontend.entrypoints=websecure"
       - "traefik.http.routers.frontend.tls=true"
       - "traefik.http.services.frontend.loadbalancer.server.port=80"
+    restart: always
 
   mysql:
     image: mysql:8.0
@@ -58,6 +62,7 @@ services:
       - ./mysql.env
     volumes:
       - mysql-data:/var/lib/mysql
+    restart: always
   
   mysql-cron-backup:
     image: fradelg/mysql-cron-backup
@@ -71,7 +76,7 @@ services:
       - "traefik.enable=false"
     restart: unless-stopped
 
-  certs-helper:
+  config-helper:
     image: alpine
     volumes:
       - traefik-config:/etc/traefik
@@ -82,7 +87,7 @@ services:
         mkdir -p /etc/traefik
         cp /tmp/traefik_dynamic.yaml /etc/traefik/.
         echo "Config copied into volume."
-    restart: "no"
+    restart: no
 
 volumes:
   traefik-certs:
