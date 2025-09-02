@@ -93,9 +93,12 @@ services:
 
 volumes:
   traefik-certs:
-    external: true
+    external:
+    name: gameplays-prod_traefik-certs
   traefik-config:
   mysql-backup:
-    external: true
+    external:
+    name: gameplays-prod_mysql-backup
   mysql-data:
-    external: true
+    external:
+    name: gameplays-prod_mysql-data
